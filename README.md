@@ -5,7 +5,8 @@ Real-world Anomaly Detection in Surveillance Videos (2018, CVPR)
 SLIC: Self-Supervised Learning with Iterative Clustering for Human Action Videos (2022, CVPR)
 논문을 참조하여 작성하였으며, 자체 GUI 프로그램을 제작하여 범죄 유형을 분석하였다.
 
-# 모델 firgure
+# Model figure
+![model figure](.crime-video-analysis-program/demo example/model figure.png)
 
 **1. 프로젝트 선정 배경 및 필요성**
 1) [범죄 발생 건수의 증가추세] 범죄 예방과 신속한 조치를 위한 방안으로 최근 CCTV 설치 대수는 증가하였지만 정작 범죄 발생 건수는 줄지 않고 있다. 국정모니터링 시스템에서 조사한 공공기관 CCTV 설치 및 운영 현황을 살피면, 2016 에는 409,028 대, 2020 년에는 704,134 대로 CCTV 증가대수가 대략 1.7 배 증가하였다. 하지만 경찰청 범죄 통계에 따르면, CCTV 가 다수 분포하고 있는 주차장에서 발생한 전체 범죄 건수는 2016 년에는 23,259 건, 2020 년에는 27,839 건으로 증가 추세를 보이고 있다.
