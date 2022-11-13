@@ -44,4 +44,6 @@ SLIC: Self-Supervised Learning with Iterative Clustering for Human Action Videos
 2) [Crime video DB] Video Clustering 을 통해 유사한 범죄 영상들끼리 그룹화되어 있는 데이터베이스를 구축한다. 어떤 사건이 발생했을 때 과거에 발생한 유사한 영상을 찾아 낼 수 있어 경찰의 빠른 사건 ·사고 처리에 도움이 될 수 있다.
 
 # Demo example
-
+1. Anomaly detection
+![anomaly detection](https://user-images.githubusercontent.com/101051049/201533668-ccae881a-e416-4eeb-be1d-6aa375fc46a0.png)
+2. Clustering
