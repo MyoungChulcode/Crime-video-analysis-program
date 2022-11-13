@@ -42,3 +42,6 @@ SLIC: Self-Supervised Learning with Iterative Clustering for Human Action Videos
 **5. 기대효과 및 활용방안**
 1) [영상 분석 시스템 개선] 범죄 영상분석과 직접적인 관련성을 가진 CCTV 통제실에서 긴 감시 카메라 영상을 수동으로 분석할 필요 없이 제안하는 시스템을 활용하여 자동으로 범죄 장면만 추출하고 범죄 유형과 행동을 분석할 있다.
 2) [Crime video DB] Video Clustering 을 통해 유사한 범죄 영상들끼리 그룹화되어 있는 데이터베이스를 구축한다. 어떤 사건이 발생했을 때 과거에 발생한 유사한 영상을 찾아 낼 수 있어 경찰의 빠른 사건 ·사고 처리에 도움이 될 수 있다.
+
+# Demo example
+
