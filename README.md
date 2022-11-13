@@ -1,4 +1,4 @@
-# crime-video-analysis-program
+# Crime video analysis program
 
 본 코드는,
 Real-world Anomaly Detection in Surveillance Videos (2018, CVPR)
