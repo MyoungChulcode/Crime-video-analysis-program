@@ -1,0 +1,228 @@
+//  Project.h: interface of CProject (main project class you will write)
+//	Dept. Software Convergence, Kyung Hee University
+//	Prof. Daeho Lee, nize@khu.ac.kr
+//
+
+#pragma once
+#include <onnxruntime_cxx_api.h>
+
+// *****************************************************C3D feature extraction*****************************************************
+struct C3D {
+	C3D(wchar_t* pExePath) : session_{ env, pExePath, Ort::SessionOptions{nullptr} } {
+		auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+		Feature_input_tensor_4 = Ort::Value::CreateTensor<float>(memory_info, input_image_4.data(), input_image_4.size(), input_shape_4.data(), input_shape_4.size());
+		Feature_input_tensor_8 = Ort::Value::CreateTensor<float>(memory_info, input_image_8.data(), input_image_8.size(), input_shape_8.data(), input_shape_8.size());
+		Feature_input_tensor_16 = Ort::Value::CreateTensor<float>(memory_info, input_image_16.data(), input_image_16.size(), input_shape_16.data(), input_shape_16.size());
+		Feature_output_tensor_4 = Ort::Value::CreateTensor<float>(memory_info, feature_results_4.data(), feature_results_4.size(), output_shape_4.data(), output_shape_4.size());
+		Feature_output_tensor_8 = Ort::Value::CreateTensor<float>(memory_info, feature_results_8.data(), feature_results_8.size(), output_shape_8.data(), output_shape_8.size());
+		Feature_output_tensor_16 = Ort::Value::CreateTensor<float>(memory_info, feature_results_16.data(), feature_results_16.size(), output_shape_16.data(), output_shape_16.size());
+	}
+
+	std::array<float, 4096> FeatureExtraction_Run_4() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Feature_input_tensor_4, 1, output_names, &Feature_output_tensor_4, 1);
+		return feature_results_4;
+	}
+
+	std::array<float, 4096> FeatureExtraction_Run_8() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Feature_input_tensor_8, 1, output_names, &Feature_output_tensor_8, 1);
+		return feature_results_8;
+	}
+
+	std::array<float, 4096> FeatureExtraction_Run_16() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Feature_input_tensor_16, 1, output_names, &Feature_output_tensor_16, 1);
+		return feature_results_16;
+	}
+
+	static constexpr const int width_ = 112;
+	static constexpr const int height_ = 112;
+
+	std::array<float, 3 * 16 * width_ * height_> input_image_4{};
+	std::array<float, 3 * 16 * width_ * height_> input_image_8{};
+	std::array<float, 3 * 16 * width_ * height_> input_image_16{};
+	std::array<float, 4096> feature_results_4{};
+	std::array<float, 4096> feature_results_8{};
+	std::array<float, 4096> feature_results_16{};
+
+private:
+	Ort::Env env;
+	Ort::Session session_;
+
+	Ort::Value Feature_input_tensor_4{ nullptr };
+	Ort::Value Feature_input_tensor_8{ nullptr };
+	Ort::Value Feature_input_tensor_16{ nullptr };
+	std::array<int64_t, 5> input_shape_4{ 1, 3, 16, width_, height_ };
+	std::array<int64_t, 5> input_shape_8{ 1, 3, 16, width_, height_ };
+	std::array<int64_t, 5> input_shape_16{ 1, 3, 16, width_, height_ };
+
+
+	Ort::Value Feature_output_tensor_4{ nullptr };
+	Ort::Value Feature_output_tensor_8{ nullptr };
+	Ort::Value Feature_output_tensor_16{ nullptr };
+	std::array<int64_t, 2> output_shape_4{ 1, 4096 };
+	std::array<int64_t, 2> output_shape_8{ 1, 4096 };
+	std::array<int64_t, 2> output_shape_16{ 1, 4096 };
+};
+
+// *****************************************************I3D(RGB) feature extraction*****************************************************
+struct I3D_RGB {
+	I3D_RGB(wchar_t* pExePath) : session_{ env, pExePath, Ort::SessionOptions{nullptr} } {
+		auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+		Feature_input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_image_.data(), input_image_.size(), input_shape.data(), input_shape.size());
+		Feature_output_tensor = Ort::Value::CreateTensor<float>(memory_info, feature_results_.data(), feature_results_.size(), output_shape.data(), output_shape.size());
+	}
+
+	std::array<float, 1024 * 1* 1 * 1> I3D_RGB_FeatureExtraction_Run() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Feature_input_tensor, 1, output_names, &Feature_output_tensor, 1);
+		return feature_results_;
+	}
+
+
+	static constexpr const int width_ = 224;
+	static constexpr const int height_ = 224;
+
+	std::array<float, 3 * 16 * width_ * height_> input_image_{};
+	std::array<float, 1024 * 1 * 1 * 1> feature_results_{};
+
+private:
+	Ort::Env env;
+	Ort::Session session_;
+
+	Ort::Value Feature_input_tensor{ nullptr };
+	std::array<int64_t, 5> input_shape{ 1, 3, 16, width_, height_ };
+
+	Ort::Value Feature_output_tensor{ nullptr };
+	std::array<int64_t, 5> output_shape{ 1, 1024, 1, 1, 1};
+};
+
+// *****************************************************I3D(flow) feature extraction*****************************************************
+struct I3D_flow {
+	I3D_flow(wchar_t* pExePath) : session_{ env, pExePath, Ort::SessionOptions{nullptr} } {
+		auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+		Feature_input_tensor = Ort::Value::CreateTensor<float>(memory_info, input_image_.data(), input_image_.size(), input_shape.data(), input_shape.size());
+		Feature_output_tensor = Ort::Value::CreateTensor<float>(memory_info, feature_results_.data(), feature_results_.size(), output_shape.data(), output_shape.size());
+	}
+
+	std::array<float, 1024 * 1 * 1 * 1> I3D_flow_FeatureExtraction_Run() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Feature_input_tensor, 1, output_names, &Feature_output_tensor, 1);
+		return feature_results_;
+	}
+
+
+	static constexpr const int width_ = 224;
+	static constexpr const int height_ = 224;
+
+	std::array<float, 2 * 16 * width_ * height_> input_image_{};
+	std::array<float, 1024 * 1 * 1 * 1> feature_results_{};
+
+private:
+	Ort::Env env;
+	Ort::Session session_;
+
+	Ort::Value Feature_input_tensor{ nullptr };
+	std::array<int64_t, 5> input_shape{ 1, 2, 16, width_, height_ };
+
+	Ort::Value Feature_output_tensor{ nullptr };
+	std::array<int64_t, 5> output_shape{ 1, 1024, 1, 1, 1 };
+};
+
+
+// *****************************************************Anomaly Detection*****************************************************
+struct Anomaly {
+	Anomaly(wchar_t* pExePath) : session_{ env, pExePath, Ort::SessionOptions{nullptr} } {
+		auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+		Anomaly_input_tensor_4 = Ort::Value::CreateTensor<float>(memory_info, input_feature_4.data(), input_feature_4.size(), input_shape_4.data(), input_shape_4.size());
+		Anomaly_input_tensor_8 = Ort::Value::CreateTensor<float>(memory_info, input_feature_8.data(), input_feature_8.size(), input_shape_8.data(), input_shape_8.size());
+		Anomaly_input_tensor_16 = Ort::Value::CreateTensor<float>(memory_info, input_feature_16.data(), input_feature_16.size(), input_shape_16.data(), input_shape_16.size());
+		Anomaly_output_tensor_4 = Ort::Value::CreateTensor<float>(memory_info, anomaly_results_4.data(), anomaly_results_4.size(), output_shape_4.data(), output_shape_4.size());
+		Anomaly_output_tensor_8 = Ort::Value::CreateTensor<float>(memory_info, anomaly_results_8.data(), anomaly_results_8.size(), output_shape_8.data(), output_shape_8.size());
+		Anomaly_output_tensor_16 = Ort::Value::CreateTensor<float>(memory_info, anomaly_results_16.data(), anomaly_results_16.size(), output_shape_16.data(), output_shape_16.size());
+	}
+
+	std::array<float, 1> AnomalyDetection_Run_4() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Anomaly_input_tensor_4, 1, output_names, &Anomaly_output_tensor_4, 1);
+		return anomaly_results_4;
+	}
+
+	std::array<float, 1> AnomalyDetection_Run_8() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Anomaly_input_tensor_8, 1, output_names, &Anomaly_output_tensor_8, 1);
+		return anomaly_results_8;
+	}
+
+	std::array<float, 1> AnomalyDetection_Run_16() {
+		const char* input_names[] = { "modelInput" };
+		const char* output_names[] = { "modelOutput" };
+
+		session_.Run(Ort::RunOptions{ nullptr }, input_names, &Anomaly_input_tensor_16, 1, output_names, &Anomaly_output_tensor_16, 1);
+		return anomaly_results_16;
+	}
+
+	std::array<float, 4096> input_feature_4{};
+	std::array<float, 4096> input_feature_8{};
+	std::array<float, 4096> input_feature_16{};
+	std::array<float, 1> anomaly_results_4{};
+	std::array<float, 1> anomaly_results_8{};
+	std::array<float, 1> anomaly_results_16{};
+
+private:
+	Ort::Env env;
+	Ort::Session session_;
+
+	Ort::Value Anomaly_input_tensor_4{ nullptr };
+	Ort::Value Anomaly_input_tensor_8{ nullptr };
+	Ort::Value Anomaly_input_tensor_16{ nullptr };
+	std::array<int64_t, 2> input_shape_4{ 1, 4096 };
+	std::array<int64_t, 2> input_shape_8{ 1, 4096 };
+	std::array<int64_t, 2> input_shape_16{ 1, 4096 };
+
+	Ort::Value Anomaly_output_tensor_4{ nullptr };
+	Ort::Value Anomaly_output_tensor_8{ nullptr };
+	Ort::Value Anomaly_output_tensor_16{ nullptr };
+	std::array<int64_t, 2> output_shape_4{ 1, 1 };
+	std::array<int64_t, 2> output_shape_8{ 1, 1 };
+	std::array<int64_t, 2> output_shape_16{ 1, 1 };
+};
+
+
+class CProject
+{
+	char m_ExePath[MAX_PATH];
+	wchar_t m_ExePathUnicode[MAX_PATH];
+	C3D* m_pC3d;
+	Anomaly* m_pAnomaly;
+	I3D_RGB* m_pI3d_RGB;
+	I3D_flow* m_pI3d_flow;
+	int m_loadingNum = 0, m_anomalyScores, m_frameStride_4, m_frameStride_8, m_frameStride_16, m_StrideInterval, m_totalSequence, m_SequenceIndex, m_lowersegmentIndex, m_uppersegmentIndex, m_segmentInterval, m_nSegment, m_previousNum;
+	float m_featureSquareSum, m_featureNorm, m_featureAverage, m_featureSum;
+	cv::Mat m_PreviousImage, m_graphImage, m_C3d_cvFeature_show;
+	cv::Point m_p0, m_p1;
+	std::vector<int> m_anomalyScoresVec, m_thirty2Shots_int;
+	std::vector<float> m_thirty2Shots;
+	std::vector<cv::Mat> m_C3dInputR, m_C3dInputG, m_C3dInputB, m_I3dInputR, m_I3dInputG, m_I3dInputB;
+	std::array<float, 4096> m_featureArray;
+
+public:
+	CProject();
+	~CProject();
+	void Run(cv::Mat Input, cv::Mat& Output, bool bFirstRun, bool bVerbose, int FrameCnt, int FrameCur);
+};

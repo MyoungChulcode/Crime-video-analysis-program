@@ -1,0 +1,321 @@
+//  Project.cpp: implementation of CProject (main project class you will write)
+//	Dept. Software Convergence, Kyung Hee University
+//	Prof. Daeho Lee, nize@khu.ac.kr
+//
+
+#include "KhuCvApp.h"
+#include "Project.h"
+
+#ifdef _MSC_VER
+#ifdef _DEBUG
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+#endif
+
+CProject::CProject() {
+#ifdef UNICODE
+	GetModuleFileName(NULL, m_ExePathUnicode, MAX_PATH);
+	int len = WideCharToMultiByte(CP_ACP, 0, m_ExePathUnicode, -1, NULL, 0, NULL, NULL);
+	WideCharToMultiByte(CP_ACP, 0, m_ExePathUnicode, -1, m_ExePath, len, NULL, NULL);
+#else
+	GetModuleFileName(NULL, m_ExePath, MAX_PATH);
+	int len = MultiByteToWideChar(CP_ACP, 0, m_ExePath, -1, NULL, 0);
+	MultiByteToWideChar(CP_ACP, 0, m_ExePath, -1, m_ExePathUnicode, len);
+#endif
+
+	int i;
+	int LastBackSlash = -1;
+	int nLen = strlen(m_ExePath);
+	for (i = nLen - 1; i >= 0; i--)
+	{
+		if (m_ExePath[i] == '\\') {
+			LastBackSlash = i;
+			break;
+		}
+	}
+
+	if (LastBackSlash >= 0)
+		m_ExePath[LastBackSlash] = '\0';
+
+	LastBackSlash = -1;
+	nLen = wcslen(m_ExePathUnicode);
+	for (i = nLen - 1; i >= 0; i--)
+	{
+		if (m_ExePathUnicode[i] == L'\\') {
+			LastBackSlash = i;
+			break;
+		}
+	}
+
+	if (LastBackSlash >= 0)
+		m_ExePathUnicode[LastBackSlash] = L'\0';
+
+	wchar_t C3dPath[MAX_PATH];
+	wcscpy(C3dPath, m_ExePathUnicode);
+	wcscat(C3dPath, L"/feature_extractor.onnx");
+	m_pC3d = new C3D(C3dPath);
+
+	wchar_t AnomalyPath[MAX_PATH];
+	wcscpy(AnomalyPath, m_ExePathUnicode);
+	wcscat(AnomalyPath, L"/anomaly_detector.onnx");
+	m_pAnomaly = new Anomaly(AnomalyPath);
+}
+
+CProject::~CProject() {
+	delete m_pC3d;
+	delete m_pAnomaly;
+}
+
+std::vector<float> linspace(float start_in, float end_in, int num_in) {
+	std::vector<float> linspaced;
+
+	float start = static_cast<float>(start_in);
+	float end = static_cast<float>(end_in);
+	float num = static_cast<float>(num_in);
+
+	if (num == 0) { return linspaced; }
+	if (num == 1) {
+		linspaced.push_back(start);
+		return linspaced;
+	}
+
+	float delta = (end - start) / (num - 1);
+
+	for (int i = 0; i < num - 1; ++i) {
+		linspaced.push_back(start + delta * i);
+	}
+	linspaced.push_back(end);
+
+	return linspaced;
+}
+
+/*
+void CProject::GetExecutionPath() {
+	wxFileName f(wxStandardPaths::Get().GetExecutablePath());
+	wxString appPath(f.GetPath());
+
+	wcscpy(m_ExePathUnicode, appPath);
+	strcpy(m_ExePath, appPath.c_str());
+}
+*/
+
+
+void CProject::Run(cv::Mat Input, cv::Mat& Output, bool bFirstRun, bool bVerbose, int FrameCnt, int FrameCur) {
+	m_totalSequence = FrameCnt / 16;
+
+	if (FrameCur == 0) {
+		m_graphImage = cv::Mat(100, 1200, CV_8UC3, cv::Scalar(255, 255, 255));
+		m_loadingNum = 1;
+		m_graphIndex_4 = 1;
+		m_graphIndex_8 = 1;
+		m_graphIndex_16 = 1;
+		m_p0_4 = cv::Point(0, 100);
+		m_p0_8 = cv::Point(0, 100);
+		m_p0_16 = cv::Point(0, 100);
+	}
+	DlgPrintf("**************************************");
+	DlgPrintf("m_loadingNum %d", m_loadingNum);
+
+	// convert input image to RGB vector
+	cv::Mat C3dFrame;
+	cv::Mat BGR[3];
+	cv::resize(Input, C3dFrame, cv::Size(112, 112), 0, 0, cv::INTER_AREA);
+	cv::split(C3dFrame, BGR);
+	BGR[0].convertTo(BGR[0], CV_32FC1);
+	BGR[1].convertTo(BGR[1], CV_32FC1);
+	BGR[2].convertTo(BGR[2], CV_32FC1);
+
+	// frame stride: 4
+	m_C3dInputB_4.push_back(BGR[0]);
+	m_C3dInputG_4.push_back(BGR[1]);
+	m_C3dInputR_4.push_back(BGR[2]);
+
+	DlgPrintf("m_C3dInputR_4 %d", m_C3dInputR_4.size());
+
+	// frame stride: 8
+	if (m_loadingNum % 8 == 0) {
+		for (int i = 0; i < 8; i++) {
+			m_C3dInputB_8.push_back(m_C3dInputB_4[i]);
+			m_C3dInputG_8.push_back(m_C3dInputG_4[i]);
+			m_C3dInputR_8.push_back(m_C3dInputR_4[i]);
+		}
+	}
+	DlgPrintf("m_C3dInputR_8 %d", m_C3dInputR_8.size());
+
+	// frame stride: 16
+	if (m_loadingNum % 16 == 0) {
+		for (int i = 0; i < 16; i++) {
+			m_C3dInputB_16.push_back(m_C3dInputB_4[i]);
+			m_C3dInputG_16.push_back(m_C3dInputG_4[i]);
+			m_C3dInputR_16.push_back(m_C3dInputR_4[i]);
+		}
+	}
+	DlgPrintf("m_C3dInputR_16 %d", m_C3dInputR_16.size());
+	DlgPrintf("**************************************");
+
+	++m_loadingNum;
+
+	// frame stride: 4
+	// 검은색 그래프
+	if (m_C3dInputR_4.size() >= 16) {
+		float* output_4 = m_pC3d->input_image_4.data();
+
+		for (int i = 0; i < 16; ++i) {
+			memcpy(output_4 + 0 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputB_4[i].data, sizeof(float) * 112 * 112);
+			memcpy(output_4 + 1 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputG_4[i].data, sizeof(float) * 112 * 112);
+			memcpy(output_4 + 2 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputR_4[i].data, sizeof(float) * 112 * 112);
+		}
+
+		m_pC3d->FeatureExtraction_Run_4();
+		cv::Mat cvFeature_4(64, 64, CV_32FC1);
+		memcpy(cvFeature_4.data, m_pC3d->feature_results_4.data(), 4096 * sizeof(float));
+		DisplayImage(cvFeature_4, Input.cols * 2, 0, false, true);
+
+		// frame stride: 4
+		m_frameStride_4 = 4;
+		m_C3dInputB_4.erase(m_C3dInputB_4.begin(), m_C3dInputB_4.begin() + m_frameStride_4);
+		m_C3dInputG_4.erase(m_C3dInputG_4.begin(), m_C3dInputG_4.begin() + m_frameStride_4);
+		m_C3dInputR_4.erase(m_C3dInputR_4.begin(), m_C3dInputR_4.begin() + m_frameStride_4);
+
+		// L2-norm
+		m_featureNorm = 0, m_featureSquareSum = 0;
+		for (int i = 0; i < std::size(m_pC3d->feature_results_4); i++) {
+			m_featureSquareSum += m_pC3d->feature_results_4[i] * m_pC3d->feature_results_4[i];
+		}
+		m_featureNorm = std::sqrt(m_featureSquareSum);
+		DlgPrintf("m_featureNorm %f", m_featureNorm);
+		for (int i = 0; i < std::size(m_pC3d->feature_results_4); i++) {
+			m_pC3d->feature_results_4[i] = m_pC3d->feature_results_4[i] / m_featureNorm;
+		}
+
+		memcpy(m_pAnomaly->input_feature_4.data(), m_pC3d->feature_results_4.data(), 4096 * sizeof(float));
+
+		m_pAnomaly->AnomalyDetection_Run_4();
+
+		// anomaly detection(score)
+		float* scores_4 = (float*)(m_pAnomaly->anomaly_results_4.data());
+		m_anomalyScores_4 = (int)(*scores_4 * 100);
+		m_anomalyScoresVec_4.push_back(m_anomalyScores_4);
+
+		DlgPrintf("*********************************");
+		DlgPrintf("Anomaly Score(stride 4) %d", m_anomalyScores_4);
+		DlgPrintf("*********************************");
+
+		m_p1_4 = cv::Point((1200 / m_totalSequence) * ((float)m_frameStride_4 / 16) * m_graphIndex_4, 101 - (int)(m_anomalyScoresVec_4[m_graphIndex_4 - 1]) - 1);
+		cv::line(m_graphImage, m_p0_4, m_p1_4, cv::Scalar(0, 0, 0), 2);
+		m_p0_4 = m_p1_4;
+		m_graphIndex_4++;
+	}
+
+	// frame stride: 8
+	// 파란색 그래프
+	if (m_C3dInputR_8.size() >= 16) {
+		float* output_8 = m_pC3d->input_image_8.data();
+
+		for (int i = 0; i < 16; ++i) {
+			memcpy(output_8 + 0 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputB_8[i].data, sizeof(float) * 112 * 112);
+			memcpy(output_8 + 1 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputG_8[i].data, sizeof(float) * 112 * 112);
+			memcpy(output_8 + 2 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputR_8[i].data, sizeof(float) * 112 * 112);
+		}
+
+		m_pC3d->FeatureExtraction_Run_8();
+		cv::Mat cvFeature_8(64, 64, CV_32FC1);
+		memcpy(cvFeature_8.data, m_pC3d->feature_results_8.data(), 4096 * sizeof(float));
+		DisplayImage(cvFeature_8, Input.cols * 3, 0, false, true);
+
+		// frame stride: 4
+		m_frameStride_8 = 8;
+		m_C3dInputB_8.erase(m_C3dInputB_8.begin(), m_C3dInputB_8.begin() + m_frameStride_8);
+		m_C3dInputG_8.erase(m_C3dInputG_8.begin(), m_C3dInputG_8.begin() + m_frameStride_8);
+		m_C3dInputR_8.erase(m_C3dInputR_8.begin(), m_C3dInputR_8.begin() + m_frameStride_8);
+
+		// L2-norm
+		m_featureNorm = 0, m_featureSquareSum = 0;
+		for (int i = 0; i < std::size(m_pC3d->feature_results_8); i++) {
+			m_featureSquareSum += m_pC3d->feature_results_8[i] * m_pC3d->feature_results_8[i];
+		}
+		m_featureNorm = std::sqrt(m_featureSquareSum);
+		DlgPrintf("m_featureNorm %f", m_featureNorm);
+		for (int i = 0; i < std::size(m_pC3d->feature_results_8); i++) {
+			m_pC3d->feature_results_8[i] = m_pC3d->feature_results_8[i] / m_featureNorm;
+		}
+
+		memcpy(m_pAnomaly->input_feature_8.data(), m_pC3d->feature_results_8.data(), 4096 * sizeof(float));
+
+		m_pAnomaly->AnomalyDetection_Run_8();
+
+		// anomaly detection(score)
+		float* scores_8 = (float*)(m_pAnomaly->anomaly_results_8.data());
+		m_anomalyScores_8 = (int)(*scores_8 * 100);
+		m_anomalyScoresVec_8.push_back(m_anomalyScores_8);
+
+		DlgPrintf("*********************************");
+		DlgPrintf("Anomaly Score(stride 8) %d", m_anomalyScores_8);
+		DlgPrintf("*********************************");
+
+		m_p1_8 = cv::Point((1200 / m_totalSequence) * ((float)m_frameStride_8 / 16) * m_graphIndex_8, 101 - (int)(m_anomalyScoresVec_8[m_graphIndex_8 - 1]) - 1);
+		cv::line(m_graphImage, m_p0_8, m_p1_8, cv::Scalar(0, 0, 255), 2);
+		m_p0_8 = m_p1_8;
+		m_graphIndex_8++;
+	}
+
+	// frame stride: 16
+	// 빨간색 그래프
+	if (m_C3dInputR_16.size() >= 16) {
+		float* output_16 = m_pC3d->input_image_16.data();
+
+		for (int i = 0; i < 16; ++i) {
+			memcpy(output_16 + 0 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputB_16[i].data, sizeof(float) * 112 * 112);
+			memcpy(output_16 + 1 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputG_16[i].data, sizeof(float) * 112 * 112);
+			memcpy(output_16 + 2 * 16 * 112 * 112 + 112 * 112 * i, m_C3dInputR_16[i].data, sizeof(float) * 112 * 112);
+		}
+
+		m_pC3d->FeatureExtraction_Run_16();
+		cv::Mat cvFeature_16(64, 64, CV_32FC1);
+		memcpy(cvFeature_16.data, m_pC3d->feature_results_16.data(), 4096 * sizeof(float));
+		DisplayImage(cvFeature_16, Input.cols * 4, 0, false, true);
+
+		// frame stride: 16
+		m_frameStride_16 = 16;
+		m_C3dInputB_16.erase(m_C3dInputB_16.begin(), m_C3dInputB_16.begin() + m_frameStride_16);
+		m_C3dInputG_16.erase(m_C3dInputG_16.begin(), m_C3dInputG_16.begin() + m_frameStride_16);
+		m_C3dInputR_16.erase(m_C3dInputR_16.begin(), m_C3dInputR_16.begin() + m_frameStride_16);
+
+		// L2-norm
+		m_featureNorm = 0, m_featureSquareSum = 0;
+		for (int i = 0; i < std::size(m_pC3d->feature_results_16); i++) {
+			m_featureSquareSum += m_pC3d->feature_results_16[i] * m_pC3d->feature_results_16[i];
+		}
+		m_featureNorm = std::sqrt(m_featureSquareSum);
+		DlgPrintf("m_featureNorm %f", m_featureNorm);
+		for (int i = 0; i < std::size(m_pC3d->feature_results_16); i++) {
+			m_pC3d->feature_results_16[i] = m_pC3d->feature_results_16[i] / m_featureNorm;
+		}
+
+		memcpy(m_pAnomaly->input_feature_16.data(), m_pC3d->feature_results_16.data(), 4096 * sizeof(float));
+
+		m_pAnomaly->AnomalyDetection_Run_16();
+
+		// anomaly detection(score)
+		float* scores_16 = (float*)(m_pAnomaly->anomaly_results_16.data());
+		m_anomalyScores_16 = (int)(*scores_16 * 100);
+		m_anomalyScoresVec_16.push_back(m_anomalyScores_16);
+
+		DlgPrintf("*********************************");
+		DlgPrintf("Anomaly Score(stride 16) %d", m_anomalyScores_16);
+		DlgPrintf("*********************************");
+
+		m_p1_16 = cv::Point((1200 / m_totalSequence) * ((float)m_frameStride_16 / 16) * m_graphIndex_16, 101 - (int)(m_anomalyScoresVec_16[m_graphIndex_16 - 1]) - 1);
+		cv::line(m_graphImage, m_p0_16, m_p1_16, cv::Scalar(255, 0, 0), 2);
+		m_p0_16 = m_p1_16;
+		m_graphIndex_16++;
+	}
+
+	DisplayImage(m_graphImage, 0, Input.rows, false, true);
+
+	m_PreviousImage = Input.clone();
+}

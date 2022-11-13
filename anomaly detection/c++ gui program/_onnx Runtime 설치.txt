@@ -1,0 +1,7 @@
+1. https://github.com/microsoft/onnxruntime/releases/ 에서 onnxruntime-win-x64-1.12.0.zip 다운로드, 적절한 위치에 압축 풀기
+2. https://onnxruntimetestdata.blob.core.windows.net/models/libpng.zip 에서 libpng 1.6 다운로드, 적절한 위치에 압축 풀기
+3. https://github.com/microsoft/onnxruntime-inference-examples 다운로드, 적절한 위치에 압축 풀기
+4. Developer Command Prompt for Visual Studio 실행 -> 3의 c_cxx 폴더로 이동 -> mkdir build && cd build 
+-> cmake .. -A x64 -T host=x64 -DLIBPNG_ROOTDIR=C:\path\to\your\libpng\binary -DONNXRUNTIME_ROOTDIR=c:\dev\ort_install
+예) cmake .. -A x64 -T host=x64 -DLIBPNG_ROOTDIR=C:\cpp_lib\libpng -DONNXRUNTIME_ROOTDIR=C:\cpp_lib\onnxruntime-win-x64-1.12.0
+5. build 폴더의 onnxruntime_samples.sln 실행

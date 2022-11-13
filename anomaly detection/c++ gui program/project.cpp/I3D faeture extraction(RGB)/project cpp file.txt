@@ -1,0 +1,236 @@
+//  Project.cpp: implementation of CProject (main project class you will write)
+//	Dept. Software Convergence, Kyung Hee University
+//	Prof. Daeho Lee, nize@khu.ac.kr
+//
+
+#include "KhuCvApp.h"
+#include "Project.h"
+
+#ifdef _MSC_VER
+#ifdef _DEBUG
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+#endif
+
+CProject::CProject() {
+#ifdef UNICODE
+	GetModuleFileName(NULL, m_ExePathUnicode, MAX_PATH);
+	int len = WideCharToMultiByte(CP_ACP, 0, m_ExePathUnicode, -1, NULL, 0, NULL, NULL);
+	WideCharToMultiByte(CP_ACP, 0, m_ExePathUnicode, -1, m_ExePath, len, NULL, NULL);
+#else
+	GetModuleFileName(NULL, m_ExePath, MAX_PATH);
+	int len = MultiByteToWideChar(CP_ACP, 0, m_ExePath, -1, NULL, 0);
+	MultiByteToWideChar(CP_ACP, 0, m_ExePath, -1, m_ExePathUnicode, len);
+#endif
+
+	int i;
+	int LastBackSlash = -1;
+	int nLen = strlen(m_ExePath);
+	for (i = nLen - 1; i >= 0; i--)
+	{
+		if (m_ExePath[i] == '\\') {
+			LastBackSlash = i;
+			break;
+		}
+	}
+
+	if (LastBackSlash >= 0)
+		m_ExePath[LastBackSlash] = '\0';
+
+	LastBackSlash = -1;
+	nLen = wcslen(m_ExePathUnicode);
+	for (i = nLen - 1; i >= 0; i--)
+	{
+		if (m_ExePathUnicode[i] == L'\\') {
+			LastBackSlash = i;
+			break;
+		}
+	}
+
+	if (LastBackSlash >= 0)
+		m_ExePathUnicode[LastBackSlash] = L'\0';
+
+	wchar_t C3dPath[MAX_PATH];
+	wcscpy(C3dPath, m_ExePathUnicode);
+	wcscat(C3dPath, L"/feature_extractor.onnx");
+	m_pC3d = new C3D(C3dPath);
+
+	wchar_t AnomalyPath[MAX_PATH];
+	wcscpy(AnomalyPath, m_ExePathUnicode);
+	wcscat(AnomalyPath, L"/anomaly_detector.onnx");
+	m_pAnomaly = new Anomaly(AnomalyPath);
+
+	wchar_t I3d_RGB_Path[MAX_PATH];
+	wcscpy(I3d_RGB_Path, m_ExePathUnicode);
+	wcscat(I3d_RGB_Path, L"/i3d(RGB)_feature_extractor.onnx");
+	m_pI3d_RGB = new I3D_RGB(I3d_RGB_Path);
+
+	wchar_t I3d_flow_Path[MAX_PATH];
+	wcscpy(I3d_flow_Path, m_ExePathUnicode);
+	wcscat(I3d_flow_Path, L"/i3d(flow)_feature_extractor.onnx");
+	m_pI3d_flow = new I3D_flow(I3d_flow_Path);
+}
+
+CProject::~CProject() {
+	delete m_pC3d;
+	delete m_pAnomaly;
+	delete m_pI3d_RGB;
+	delete m_pI3d_flow;
+}
+
+
+std::vector<float> linspace(float start_in, float end_in, int num_in) {
+	std::vector<float> linspaced;
+
+	float start = static_cast<float>(start_in);
+	float end = static_cast<float>(end_in);
+	float num = static_cast<float>(num_in);
+
+	if (num == 0) { return linspaced; }
+	if (num == 1) {
+		linspaced.push_back(start);
+		return linspaced;
+	}
+
+	float delta = (end - start) / (num - 1);
+
+	for (int i = 0; i < num - 1; ++i) {
+		linspaced.push_back(start + delta * i);
+	}
+	linspaced.push_back(end);
+
+	return linspaced;
+}
+
+/*
+void CProject::GetExecutionPath() {
+	wxFileName f(wxStandardPaths::Get().GetExecutablePath());
+	wxString appPath(f.GetPath());
+
+	wcscpy(m_ExePathUnicode, appPath);
+	strcpy(m_ExePath, appPath.c_str());
+}
+*/
+
+
+void CProject::Run(cv::Mat Input, cv::Mat& Output, bool bFirstRun, bool bVerbose, int FrameCnt, int FrameCur) {
+	cv::Mat I3DFrame;
+	cv::Mat BGR[3];
+	cv::resize(Input, I3DFrame, cv::Size(224, 224), 0, 0, cv::INTER_AREA);
+
+	// RGB split
+	cv::split(I3DFrame, BGR);
+	BGR[0].convertTo(BGR[0], CV_32FC1);
+	BGR[1].convertTo(BGR[1], CV_32FC1);
+	BGR[2].convertTo(BGR[2], CV_32FC1);
+
+	// flow split
+	/*
+	if (FrameCur >= 2) {
+		cv::Mat Frame1;
+		cv::cvtColor(m_PreviousImage, Frame1, cv::COLOR_BGR2GRAY);
+
+		cv::Mat Frame2;
+		cv::cvtColor(I3DFrame, Frame2, cv::COLOR_BGR2GRAY);
+
+		cv::Mat flow(224, 224, CV_32FC2);
+		cv::calcOpticalFlowFarneback(Frame1, Frame2, flow);
+
+		// visualization
+		cv::Mat flow_parts[2];
+		split(flow, flow_parts);
+		cv::Mat magnitude, angle, magn_norm;
+		cartToPolar(flow_parts[0], flow_parts[1], magnitude, angle, true);
+		normalize(magnitude, magn_norm, 0.0f, 1.0f, cv::NORM_MINMAX);
+		angle *= ((1.f / 360.f) * (180.f / 255.f));
+
+		//build hsv image
+		cv::Mat _hsv[3], hsv, hsv8, bgr;
+		_hsv[0] = angle;
+		_hsv[1] = cv::Mat::ones(angle.size(), CV_32F);
+		_hsv[2] = magn_norm;
+		cv::merge(_hsv, 3, hsv);
+		hsv.convertTo(hsv8, CV_8U, 255.0);
+		cv::cvtColor(hsv8, bgr, cv::COLOR_HSV2BGR);
+
+		DisplayImage(flow, Input.rows, 0, false, true);
+	}
+	*/
+
+
+
+	m_I3dInputB.push_back(BGR[0]);
+	m_I3dInputG.push_back(BGR[1]);
+	m_I3dInputR.push_back(BGR[2]);
+
+	if (m_I3dInputB.size() >= 16) {
+
+		// RGB
+		float* output = m_pI3d_RGB->input_image_.data();
+
+		for (int i = 0; i < 16; ++i) {
+			memcpy(output + 0 * 16 * 224 * 224 + 224 * 224 * i, m_I3dInputB[i].data, sizeof(float) * 224 * 224);
+			memcpy(output + 1 * 16 * 224 * 224 + 224 * 224 * i, m_I3dInputG[i].data, sizeof(float) * 224 * 224);
+			memcpy(output + 2 * 16 * 224 * 224 + 224 * 224 * i, m_I3dInputR[i].data, sizeof(float) * 224 * 224);
+		}
+
+		m_pI3d_RGB->I3D_RGB_FeatureExtraction_Run();
+		cv::Mat cvFeature(32, 32, CV_32FC1);
+		memcpy(cvFeature.data, m_pI3d_RGB->feature_results_.data(), 1024 * sizeof(float));
+
+		cv::Mat cvFeature_show(350, 600, CV_32FC1);
+		cv::resize(cvFeature, cvFeature_show, cv::Size(350, 350), 0, 0, cv::INTER_AREA);
+		DisplayImage(cvFeature_show, Input.cols * 2, 0, false, true);
+
+		m_I3dInputB.clear();
+		m_I3dInputG.clear();
+		m_I3dInputR.clear();
+		/*
+		// video file anomaly detection(32 segment L2 normalization)
+		m_featureNorm = 0, m_featureSquareSum = 0;
+		for (int i = 0; i < std::size(m_pC3d->feature_results_); i++) {
+			m_featureSquareSum += std::pow(std::abs(m_pC3d->feature_results_[i]), 2);
+		}
+		m_featureNorm = std::sqrt(m_featureSquareSum);
+		for (int i = 0; i < std::size(m_pC3d->feature_results_); i++) {
+			m_pC3d->feature_results_[i] = m_pC3d->feature_results_[i] / m_featureNorm;
+		}
+
+		memcpy(m_pAnomaly->input_feature_.data(), m_pC3d->feature_results_.data(), 4096 * sizeof(float));
+
+		m_pAnomaly->AnomalyDetection_Run();
+
+		float* scores = (float*)(m_pAnomaly->anomaly_results_.data());
+		m_anomalyScores = (int)(*scores * 100);
+		m_anomalyScoresVec.push_back(m_anomalyScores);
+
+		DlgPrintf("*********************************");
+		DlgPrintf("Anomaly Score %d", m_anomalyScores);
+		DlgPrintf("*********************************");
+
+
+		if (FrameCur <= 15) {
+			m_graphImage = cv::Mat(100, 1000, CV_8UC3, cv::Scalar(255, 255, 255));
+			m_loadingNum = 0;
+			m_p0 = cv::Point(0, 100);
+		}
+		m_p1 = cv::Point(FrameCur, 101 - (int)(m_anomalyScoresVec[m_loadingNum]) - 1);
+
+		if (m_anomalyScoresVec[m_loadingNum] > 50.) {
+			cv::line(m_graphImage, m_p0, m_p1, cv::Scalar(0, 0, 255), 3);
+		}
+		else {
+			cv::line(m_graphImage, m_p0, m_p1, cv::Scalar(0, 0, 0), 2);
+		}
+		m_p0 = m_p1;
+		++m_loadingNum;
+
+		DisplayImage(m_graphImage, 0, Input.rows, false, true);
+		*/
+	}
+	m_PreviousImage = Input.clone();
+}
