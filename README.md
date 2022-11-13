@@ -46,6 +46,5 @@ SLIC: Self-Supervised Learning with Iterative Clustering for Human Action Videos
 # Demo example
 **1. Anomaly detection**
 ![anomaly detection](https://user-images.githubusercontent.com/101051049/201533668-ccae881a-e416-4eeb-be1d-6aa375fc46a0.png)
-
 **2. Clustering**
 ![clustering](https://user-images.githubusercontent.com/101051049/201533705-f7b8d6c2-f0aa-4704-8f51-2e8941c6c4d5.png)
